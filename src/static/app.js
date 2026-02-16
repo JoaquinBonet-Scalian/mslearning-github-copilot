@@ -20,12 +20,30 @@ document.addEventListener("DOMContentLoaded", () => {
 
         const spotsLeft = details.max_participants - details.participants.length;
 
+        // Build participants section
+        let participantsHTML = `<div class="participants-section">`;
+        participantsHTML += `<h5>Participants</h5>`;
+        if (details.participants && details.participants.length > 0) {
+          participantsHTML += `<ul class="participants-list">`;
+          details.participants.forEach(email => {
+            participantsHTML += `<li><span class="participant-email">${email}</span><button class="delete-participant" title="Remove participant" data-activity="${encodeURIComponent(name)}" data-email="${encodeURIComponent(email)}">
+              <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#c62828" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
+            </button></li>`;
+          });
+          participantsHTML += `</ul>`;
+        } else {
+          participantsHTML += `<div class="participants-empty">No participants yet</div>`;
+        }
+        participantsHTML += `</div>`;
+
         activityCard.innerHTML = `
           <h4>${name}</h4>
           <p>${details.description}</p>
           <p><strong>Schedule:</strong> ${details.schedule}</p>
           <p><strong>Availability:</strong> ${spotsLeft} spots left</p>
+          ${participantsHTML}
         `;
+
 
         activitiesList.appendChild(activityCard);
 
@@ -35,11 +53,32 @@ document.addEventListener("DOMContentLoaded", () => {
         option.textContent = name;
         activitySelect.appendChild(option);
       });
-    } catch (error) {
-      activitiesList.innerHTML = "<p>Failed to load activities. Please try again later.</p>";
-      console.error("Error fetching activities:", error);
-    }
+    // Add delete event listeners for participants
+    activitiesList.querySelectorAll('.delete-participant').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        const activity = decodeURIComponent(btn.getAttribute('data-activity'));
+        const email = decodeURIComponent(btn.getAttribute('data-email'));
+        if (!confirm(`Remove ${email} from ${activity}?`)) return;
+        try {
+          const response = await fetch(`/activities/${encodeURIComponent(activity)}/signup?email=${encodeURIComponent(email)}`, {
+            method: 'DELETE',
+          });
+          if (response.ok) {
+            fetchActivities();
+          } else {
+            const result = await response.json();
+            alert(result.detail || 'Failed to remove participant.');
+          }
+        } catch (err) {
+          alert('Failed to remove participant.');
+        }
+      });
+    });
+  } catch (error) {
+    activitiesList.innerHTML = "<p>Failed to load activities. Please try again later.</p>";
+    console.error("Error fetching activities:", error);
   }
+}
 
   // Handle form submission
   signupForm.addEventListener("submit", async (event) => {
@@ -62,6 +101,7 @@ document.addEventListener("DOMContentLoaded", () => {
         messageDiv.textContent = result.message;
         messageDiv.className = "success";
         signupForm.reset();
+        fetchActivities();
       } else {
         messageDiv.textContent = result.detail || "An error occurred";
         messageDiv.className = "error";
